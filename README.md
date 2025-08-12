@@ -1,8 +1,9 @@
 # Diff Excel
-## 简单高效的 Excel 差异对比工具
+简单高效的 Excel 差异对比工具
+
 Tools for comparing two Excel files
 
-## 功能：
+## 描述：
 - 支持选择两个 Excel 文件及指定 Sheet 进行内容对比
 - 自动生成对比差异的 Excel 文件，高亮显示不同单元格
 - 输出差异日志TXT，详细记录差异内容和位置
