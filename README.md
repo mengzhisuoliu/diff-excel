@@ -16,17 +16,33 @@ Tools for comparing two Excel files
 - MacOS: [diffExcel](https://github.com/zbuzhi/diff-excel/releases/download/v1.0.0/diffExcel)
 - Windows: [diffExcel.exe](https://github.com/zbuzhi/diff-excel/releases/download/v1.0.0/diffExcel.exe)
 
-## 运行/编译
-```go
+## 运行
+```sh
 # 下载依赖
 go mod tidy
 
 # 运行
 go run main.go
-
-# 编译（linux/macOS）
+```
+## 编译
+```sh
+# linux/macOS
 go build -o diffExcel
 
-# 编译（Windows）
+# Windows
 go build -o diffExcel.exe
+```
+
+### 在 macOS 上编译 Windows 可执行文件
+需要安装`mingw-w64`，配置`CC`
+```sh
+# 1. Homebrew 安装 mingw-w64
+brew install mingw-w64
+
+# 2. CC是否安装成功
+x86_64-w64-mingw32-gcc --version
+
+# 3. 编译 Windows 可执行文件
+export CC=x86_64-w64-mingw32-gcc
+GOOS=windows GOARCH=amd64 CGO_ENABLED=1 go build -o DiffExcel.exe
 ```
