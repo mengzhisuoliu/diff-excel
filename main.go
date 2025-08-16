@@ -1,6 +1,7 @@
 package main
 
 import (
+	"diff_excel/utils"
 	"fmt"
 	"image/color"
 	"os"
@@ -21,27 +22,29 @@ import (
 )
 
 type ExcelCompareApp struct {
-	myApp        fyne.App
-	myWindow     fyne.Window
-	logRich      *widget.Entry
-	srcFile      string
-	cmpFile      string
-	srcSheet     string
-	cmpSheet     string
-	outDir       string
-	outExcelFile string
-	outLogFile   string
-	highlightClr string
+	myApp            fyne.App
+	myWindow         fyne.Window
+	logRich          *widget.Entry
+	srcFile          string
+	cmpFile          string
+	srcSheet         string
+	cmpSheet         string
+	outDir           string
+	outExcelFile     string
+	outLogFile       string
+	highlightClr     string
+	showOldInComment bool
 
-	srcEntry       *widget.Entry
-	srcEntryBox    fyne.CanvasObject
-	cmpEntry       *widget.Entry
-	cmpEntryBox    fyne.CanvasObject
-	outDirEntry    *widget.Entry
-	outDirBox      fyne.CanvasObject
-	srcSheetSelect *widget.Select
-	cmpSheetSelect *widget.Select
-	colorEntry     *widget.Entry
+	srcEntry        *widget.Entry
+	srcEntryBox     fyne.CanvasObject
+	cmpEntry        *widget.Entry
+	cmpEntryBox     fyne.CanvasObject
+	outDirEntry     *widget.Entry
+	outDirBox       fyne.CanvasObject
+	srcSheetSelect  *widget.Select
+	cmpSheetSelect  *widget.Select
+	colorEntry      *widget.Entry
+	commentCheckbox *widget.Check
 
 	srcUploadFunc func()
 	cmpUploadFunc func()
@@ -67,17 +70,18 @@ func NewExcelCompareApp(w, h float32) *ExcelCompareApp {
 // 追加日志：同步终端输出和日志框内容
 func (a *ExcelCompareApp) appendLog(text string) {
 	fmt.Print(text) // 保留终端输出
-	a.logRich.SetText(a.logRich.Text + text)
+	a.logRich.Append(text)
+	// a.logRich.SetText(a.logRich.Text + text)
 }
 
 // 宽 Entry 制作函数，禁用编辑
-func (a *ExcelCompareApp) makeWideMultiLineEntry(width, height float32, defaultInput string) (*widget.Entry, fyne.CanvasObject) {
+func (a *ExcelCompareApp) makeWideMultiLineEntry(width, height float32, defaultInput, PlaceHolder string) (*widget.Entry, fyne.CanvasObject) {
 	e := widget.NewMultiLineEntry()
 	e.Wrapping = fyne.TextWrapWord
 	e.SetMinRowsVisible(2) // 让输入框高度能显示两行
 	e.Disable()            // 只读
 	e.SetText(defaultInput)
-	e.SetPlaceHolder("请输入文件地址")
+	e.SetPlaceHolder(PlaceHolder)
 
 	box := container.NewGridWrap(fyne.NewSize(width, height), e)
 	return e, box
@@ -86,19 +90,23 @@ func (a *ExcelCompareApp) makeWideMultiLineEntry(width, height float32, defaultI
 func (a *ExcelCompareApp) initUI() {
 	//execPath, _ := getExeDir()
 	w := a.myWindow.Canvas().Size().Width
-	a.srcEntry, a.srcEntryBox = a.makeWideMultiLineEntry(w/2-10, 60, "")
-	a.cmpEntry, a.cmpEntryBox = a.makeWideMultiLineEntry(w/2-10, 60, "")
-	a.outDirEntry, a.outDirBox = a.makeWideMultiLineEntry(w/2-10, 60, "")
+	a.srcEntry, a.srcEntryBox = a.makeWideMultiLineEntry(w/2-10, 60, "", "原始文件地址")
+	a.cmpEntry, a.cmpEntryBox = a.makeWideMultiLineEntry(w/2-10, 60, "", "对比文件地址")
+	a.outDirEntry, a.outDirBox = a.makeWideMultiLineEntry(w/2-10, 60, "", "输入文件目录")
 
 	a.srcSheetSelect = widget.NewSelect([]string{}, func(selected string) {
 		a.srcSheet = selected
 	})
-	a.srcSheetSelect.PlaceHolder = "上传文件后选择Sheet"
+	a.srcSheetSelect.PlaceHolder = "选择Sheet"
 
 	a.cmpSheetSelect = widget.NewSelect([]string{}, func(selected string) {
 		a.cmpSheet = selected
 	})
-	a.cmpSheetSelect.PlaceHolder = "上传文件后选择Sheet"
+	a.cmpSheetSelect.PlaceHolder = "选择Sheet"
+
+	a.commentCheckbox = widget.NewCheck("备注显示旧内容", func(checked bool) {
+		a.showOldInComment = checked
+	})
 
 	makeClearBtn := func(entry *widget.Entry, sheetSelect *widget.Select, clearVars ...*string) *widget.Button {
 		return widget.NewButton("清空", func() {
@@ -128,9 +136,9 @@ func (a *ExcelCompareApp) initUI() {
 		// 常用颜色列表
 		colors := []string{
 			"#FF0000", "#00FF00", "#0000FF",
-			"#800080", "#00FFFF", "#A52A2A",
-			"#008000", "#808000", "#800000",
-			"#008080", "#FFD700", "#FF6347",
+			"#800080", "#A52A2A",
+			"#008000", "#FF6347",
+			"#008080", "#FFD700",
 		}
 
 		var colorButtons []fyne.CanvasObject
@@ -138,8 +146,8 @@ func (a *ExcelCompareApp) initUI() {
 			colorCode := c
 			// 彩色背景方块
 			rect := canvas.NewRectangle(parseHexColor(c))
-			rect.SetMinSize(fyne.NewSize(28, 20))
-
+			// rect.SetMinSize(fyne.NewSize(5, 5))
+			rect.SetMinSize(fyne.NewSize(35, 5))
 			// 透明按钮覆盖在方块上
 			btn := widget.NewButton("", func() {
 				if onChange != nil {
@@ -171,7 +179,7 @@ func (a *ExcelCompareApp) initUI() {
 			a.srcEntry.SetText(a.srcFile)
 			r.Close()
 
-			sheets, err := getSheets(a.srcFile)
+			sheets, err := utils.GetSheets(a.srcFile)
 			if err != nil {
 				dialog.ShowError(err, a.myWindow)
 				return
@@ -201,7 +209,7 @@ func (a *ExcelCompareApp) initUI() {
 			a.cmpEntry.SetText(a.cmpFile)
 			r.Close()
 
-			sheets, err := getSheets(a.cmpFile)
+			sheets, err := utils.GetSheets(a.cmpFile)
 			if err != nil {
 				dialog.ShowError(err, a.myWindow)
 				return
@@ -248,7 +256,7 @@ func (a *ExcelCompareApp) initUI() {
 
 	a.colorEntry = widget.NewEntry()
 	a.colorEntry.SetText(a.highlightClr)
-	a.colorEntry.SetPlaceHolder("请输入颜色代码，如 #FF0000")
+	a.colorEntry.SetPlaceHolder("输入颜色代码，如 #FF0000")
 
 	compareBtn := widget.NewButton("开始对比", func() {
 		a.compareFunc()
@@ -272,53 +280,60 @@ func (a *ExcelCompareApp) initUI() {
 	// 日志标题栏，带清空按钮
 	logHeader := container.NewBorder(nil, nil, nil, clearLogBtn, widget.NewLabel("日志输出："))
 
-	setTitle := func(str string) *canvas.Text {
+	setTitle := func(str string, size float32) *canvas.Text {
 		text := canvas.NewText(str, &color.NRGBA{R: 255, G: 255, B: 255, A: 255}) // 纯黑色
 		text.TextStyle = fyne.TextStyle{Bold: true}
-		text.TextSize = 18
+		text.TextSize = size
 		return text
 	}
 	spacing := canvas.NewRectangle(nil)     // 空矩形
 	spacing.SetMinSize(fyne.NewSize(0, 10)) // 高度 10 像素，宽度 0
+
+	line := canvas.NewRectangle(nil)
+	line.SetMinSize(fyne.NewSize(50, 1))
+	line.FillColor = parseHexColor("#fff")
+	line.StrokeColor = parseHexColor("#fff")
+
 	leftBox := container.NewVBox(
-		setTitle("原始文件"),
+		setTitle("原始文件", 18),
 		spacing,
 		container.NewHBox(srcBtn, a.srcSheetSelect, srcClearBtn),
 		a.srcEntryBox,
 	)
 	rightBox := container.NewVBox(
-		setTitle("对比文件"),
+		setTitle("对比文件", 18),
 		spacing,
 		container.NewHBox(cmpBtn, a.cmpSheetSelect, cmpClearBtn),
 		a.cmpEntryBox,
 	)
 
 	leftBox2 := container.NewVBox(
-		setTitle("输出目录"),
+		setTitle("输出目录", 18),
 		spacing,
 		container.NewHBox(outDirBtn, outDirClearBtn),
 		a.outDirBox,
 	)
 
 	rightBox2 := container.NewVBox(
-		setTitle("高亮颜色 (#RRGGBB)"),
-		spacing,
+		setTitle("差异单元格设置", 18),
+		setTitle("颜色高亮", 14),
+		widget.NewSeparator(),
 		makeColorSelector(func(color string) {
 			a.colorEntry.SetText(color)
 		}),
 		a.colorEntry,
+		widget.NewSeparator(),
+		a.commentCheckbox,
 	)
 
 	content := container.NewVBox(
 		container.New(layout.NewGridLayout(2), leftBox, rightBox),
 		spacing,
 		container.New(layout.NewGridLayout(2), leftBox2, rightBox2),
-
 		container.NewVBox(
 			widget.NewLabel(""),
 			widget.NewSeparator(), // 分割线
 		),
-
 		compareBtn,
 		logHeader,
 		logScroll,
@@ -333,9 +348,7 @@ func (a *ExcelCompareApp) initUI() {
 		),
 		spacing, // 下间距
 	)
-
 	a.myWindow.SetContent(container.NewScroll(paddedContent))
-	//a.myWindow.Resize(fyne.NewSize(800, 850))
 }
 
 func (a *ExcelCompareApp) compareFunc() {
@@ -356,56 +369,50 @@ func (a *ExcelCompareApp) compareFunc() {
 		return
 	}
 
-	inputColor := strings.TrimSpace(a.colorEntry.Text)
-	if !isValidColorCode(inputColor) {
+	a.highlightClr = strings.TrimSpace(a.colorEntry.Text)
+	if !utils.IsValidColorCode(a.highlightClr) {
 		dialog.ShowError(fmt.Errorf("颜色格式错误，需形如 #RRGGBB 或 #RGB"), a.myWindow)
 		return
 	}
-	// a.highlightClr = inputColor
-	a.outExcelFile = filepath.Join(a.outDir, fmt.Sprintf("diff_excel_%s.xlsx", time.Now().Format("2006.01.02_15_04_05")))
-	a.outLogFile = filepath.Join(a.outDir, fmt.Sprintf("diff_log_%s.txt", time.Now().Format("2006.01.02_15_04_05")))
+	timeNow := time.Now().Format("2006.01.02_15_04_05")
+	a.outExcelFile = filepath.Join(a.outDir, fmt.Sprintf("diff_excel_%s.xlsx", timeNow))
+	a.outLogFile = filepath.Join(a.outDir, fmt.Sprintf("diff_log_%s.txt", timeNow))
 
 	a.appendLog("\n====== [" + time.Now().Format("2006.01.02 15:04:05") + "] 开始======\n")
-	err := CompareExcelFiles(a.srcFile, a.srcSheet, a.cmpFile, a.cmpSheet, a.highlightClr, a.outExcelFile, a.outLogFile, func(s string) {
-		a.appendLog(s)
-	})
+	err := a.CompareExcelFiles()
 	if err != nil {
 		dialog.ShowError(err, a.myWindow)
 		a.appendLog(fmt.Sprintf("错误：%v\n", err))
 	} else {
 		a.appendLog(fmt.Sprintf("Excel文件: %s\n日志文件: %s\n", a.outExcelFile, a.outLogFile))
 		a.appendLog("====== [" + time.Now().Format("2006.01.02 15:04:05") + "] 结束======\n\n")
+		a.Success()
 	}
 }
 
-func (a *ExcelCompareApp) Run() {
-	a.myWindow.ShowAndRun()
-}
-
-// 纯逻辑函数，不依赖 UI
-func CompareExcelFiles(srcFile, srcSheet, cmpFile, cmpSheet, highlightColor, outExcel, outLog string, controlTxt func(string)) error {
-	src, err := excelize.OpenFile(srcFile)
+func (a *ExcelCompareApp) CompareExcelFiles() error {
+	src, err := excelize.OpenFile(a.srcFile)
 	if err != nil {
-		controlTxt(fmt.Sprintf("打开源 Excel 出错: %v", err))
+		a.appendLog(fmt.Sprintf("打开源 Excel 出错: %v", err))
 		return fmt.Errorf("打开源 Excel 出错: %v", err)
 	}
 	defer src.Close()
 
-	cmp, err := excelize.OpenFile(cmpFile)
+	cmp, err := excelize.OpenFile(a.cmpFile)
 	if err != nil {
-		controlTxt(fmt.Sprintf("打开对比 Excel 出错: %v", err))
+		a.appendLog(fmt.Sprintf("打开对比 Excel 出错: %v", err))
 		return fmt.Errorf("打开对比 Excel 出错: %v", err)
 	}
 	defer cmp.Close()
 
-	srcRows, err := src.GetRows(srcSheet)
+	srcRows, err := src.GetRows(a.srcSheet)
 	if err != nil {
-		controlTxt(fmt.Sprintf("读取源 Excel 行失败: %v", err))
+		a.appendLog(fmt.Sprintf("读取源 Excel 行失败: %v", err))
 		return fmt.Errorf("读取源 Excel 行失败: %v", err)
 	}
-	cmpRows, err := cmp.GetRows(cmpSheet)
+	cmpRows, err := cmp.GetRows(a.cmpSheet)
 	if err != nil {
-		controlTxt(fmt.Sprintf("读取对比 Excel 行失败: %v", err))
+		a.appendLog(fmt.Sprintf("读取对比 Excel 行失败: %v", err))
 		return fmt.Errorf("读取对比 Excel 行失败: %v", err)
 	}
 
@@ -416,12 +423,12 @@ func CompareExcelFiles(srcFile, srcSheet, cmpFile, cmpSheet, highlightColor, out
 		Fill: excelize.Fill{
 			Type:    "pattern",
 			Pattern: 1,
-			Color:   []string{highlightColor},
+			Color:   []string{a.highlightClr},
 		},
 	}
 	styleID, err := diffF.NewStyle(style)
 	if err != nil {
-		controlTxt(fmt.Sprintf("创建样式失败: %v", err))
+		a.appendLog(fmt.Sprintf("创建样式失败: %v", err))
 		return fmt.Errorf("创建样式失败: %v", err)
 	}
 
@@ -431,12 +438,12 @@ func CompareExcelFiles(srcFile, srcSheet, cmpFile, cmpSheet, highlightColor, out
 		maxRow = diffMaxRow
 	}
 
-	controlTxt(fmt.Sprintf("【原始文件】%s 行数据\n", strconv.Itoa(maxRow)))
-	controlTxt(fmt.Sprintf("【对比文件】%s 行数据\n", strconv.Itoa(diffMaxRow)))
+	a.appendLog(fmt.Sprintf("【原始文件】%s 行数据\n", strconv.Itoa(maxRow)))
+	a.appendLog(fmt.Sprintf("【对比文件】%s 行数据\n", strconv.Itoa(diffMaxRow)))
 
 	var logBuilder strings.Builder
 
-	controlTxt("\n\n --------- 差异单元格 --------- \n")
+	a.appendLog("\n\n --------- 差异单元格 --------- \n")
 	diffCount := 0
 	for r := 0; r < maxRow; r++ {
 		maxCol := 0
@@ -459,72 +466,65 @@ func CompareExcelFiles(srcFile, srcSheet, cmpFile, cmpSheet, highlightColor, out
 			cell, _ := excelize.CoordinatesToCellName(c+1, r+1)
 			if oldVal != newVal {
 				diffCount++
-				controlTxt(fmt.Sprintf(" %s |", cell))
+				a.appendLog(fmt.Sprintf(" %s |", cell))
 				logLine := fmt.Sprintf("差异单元格: %s 旧数据: %s 新数据: %s\n", cell, oldVal, newVal)
 				logBuilder.WriteString(logLine)
 				diffF.SetCellValue(diffSheet, cell, newVal)
 				diffF.SetCellStyle(diffSheet, cell, cell, styleID)
+				if a.showOldInComment && oldVal != "" {
+					_ = diffF.AddComment(diffSheet, excelize.Comment{
+						Cell:   cell,
+						Author: "Diff Excel",
+						Paragraph: []excelize.RichTextRun{
+							{Text: "旧数据: \n", Font: &excelize.Font{Bold: true, Color: "#6c0808ff"}},
+							{Text: oldVal},
+						},
+						Height: 40,
+						Width:  180,
+					})
+				}
 			} else {
 				diffF.SetCellValue(diffSheet, cell, newVal)
 			}
 		}
 	}
-	controlTxt(fmt.Sprintf("\n\n --------- 差异数：%v -------- \n", diffCount))
+	a.appendLog(fmt.Sprintf("\n\n --------- 差异数：%v -------- \n", diffCount))
 
-	if err := diffF.SaveAs(outExcel); err != nil {
-		controlTxt(fmt.Sprintf("保存差异 Excel 文件失败: %v", err))
+	if err := diffF.SaveAs(a.outExcelFile); err != nil {
+		a.appendLog(fmt.Sprintf("保存差异 Excel 文件失败: %v", err))
 		return fmt.Errorf("保存差异 Excel 文件失败: %v", err)
 	}
-
-	err = os.WriteFile(outLog, []byte(logBuilder.String()), 0644)
+	err = os.WriteFile(a.outLogFile, []byte(logBuilder.String()), 0644)
 	if err != nil {
-		controlTxt(fmt.Sprintf("写入日志 TXT 文件失败: %v", err))
+		a.appendLog(fmt.Sprintf("写入日志 TXT 文件失败: %v", err))
 		return fmt.Errorf("写入日志 TXT 文件失败: %v", err)
 	}
-
 	return nil
-}
-
-func getSheets(path string) ([]string, error) {
-	f, err := excelize.OpenFile(path)
-	if err != nil {
-		return nil, err
-	}
-	defer f.Close()
-	return f.GetSheetList(), nil
-}
-
-func isValidColorCode(s string) bool {
-	if len(s) != 7 && len(s) != 4 {
-		return false
-	}
-	if s[0] != '#' {
-		return false
-	}
-	for _, c := range s[1:] {
-		if !((c >= '0' && c <= '9') ||
-			(c >= 'a' && c <= 'f') ||
-			(c >= 'A' && c <= 'F')) {
-			return false
-		}
-	}
-	return true
-}
-
-func getExeDir() (string, error) {
-	exePath, err := os.Executable()
-	if err != nil {
-		return "", err
-	}
-	dir := filepath.Dir(exePath)
-	return dir, nil
 }
 
 func setBlue(b *widget.Button) {
 	b.Importance = widget.HighImportance
 }
 
+func (a *ExcelCompareApp) Success() {
+	content := container.NewVBox(
+		// widget.NewLabel("对比完成！输出文件："),
+		widget.NewHyperlink(a.outExcelFile, nil),
+		widget.NewHyperlink(a.outLogFile, nil),
+		widget.NewActivity(),
+		container.NewHBox(
+			widget.NewButton("打开文件", func() { utils.OpenFile(a.outExcelFile) }),
+			widget.NewButton("打开文件所在目录", func() { utils.OpenDir(a.outDir) }),
+		),
+	)
+	dialog.ShowCustom("对比完成", "关闭", content, a.myWindow)
+}
+
+func (a *ExcelCompareApp) Run() {
+	a.myWindow.ShowAndRun()
+}
+
 func main() {
-	app := NewExcelCompareApp(750, 650)
+	app := NewExcelCompareApp(750, 666)
 	app.Run()
 }
