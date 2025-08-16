@@ -10,11 +10,12 @@ Tools for comparing two Excel files
 - 简洁直观的图形界面，易用且跨平台（支持 `Windows`、`macOS`、`Linux`）
 - 使用 `Go` + `fyne` + `excelize` 实现，轻量高效
 
-<img width="500" alt="diffExcel_v1" src="https://github.com/user-attachments/assets/3df203a1-a948-4e3c-9f19-a07d830e1f78" />
+<img width="500" alt="diffExcel_v1" src="https://github.com/user-attachments/assets/09253ebb-c056-4058-a20c-82cd9c024b49" />
+
 
 ## 下载
-- MacOS: [diffExcel](https://github.com/zbuzhi/diff-excel/releases/download/v1.0.0/diffExcel)
-- Windows: [diffExcel.exe](https://github.com/zbuzhi/diff-excel/releases/download/v1.0.0/diffExcel.exe)
+- MacOS: [diffExcel](https://github.com/zbuzhi/diff-excel/releases/download/v1.0.1/diffExcel)
+- Windows: [diffExcel.exe](https://github.com/zbuzhi/diff-excel/releases/download/v1.0.1/diffExcel.exe)
 
 ## 运行
 ```sh
@@ -27,10 +28,10 @@ go run main.go
 ## 编译
 ```sh
 # linux/macOS
-go build -o diffExcel
+go build -o DiffExcel
 
 # Windows
-go build -o diffExcel.exe
+go build -o DiffExcel.exe
 ```
 
 ### 在 macOS 上编译 Windows 可执行文件
