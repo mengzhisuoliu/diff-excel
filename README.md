@@ -31,7 +31,7 @@ Tools for comparing two Excel files
 
 ```bash
 # 1. 克隆项目
-git clone <repository-url>
+git clone https://github.com/zbuzhi/diff-excel
 cd diff_excel
 
 # 2. 下载依赖
@@ -43,11 +43,11 @@ go run .
 # 或者编译后运行
 # Linux/macOS
 go build -o DiffExcel
-./DiffExcel  # 
+./DiffExcel
 
 # Windows
 go build -o DiffExcel
-./DiffExcel.exe  # Windows
+./DiffExcel.exe
 
 
 # 在 macOS 上编译 Windows 可执行文件，需要安装 mingw-w64，配置 CC ⬇️
