@@ -17,6 +17,11 @@ Tools for comparing two Excel files
 - **差异高亮**：使用颜色高亮显示不同的单元格
 - **备注功能**：可在差异单元格中添加备注显示原始内容
 - **自定义颜色**：支持自定义差异高亮颜色
+<img width="915" alt="DiffExcel" src="https://github.com/user-attachments/assets/8d90251d-ef72-4f3e-9fe0-2b5dd0ea31ae" />
+
+---
+
+<img width="915" height="398" alt="DiffExcel_Demo" src="https://github.com/user-attachments/assets/c5fd8f32-5e33-4a60-9987-5cb2f84f7c05" />
 
 
 ### 技术特点
